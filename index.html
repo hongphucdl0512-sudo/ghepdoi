@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kiosk Ghép Đôi Sinh Viên</title>
+  <style>
+    :root {
+      --primary: #4F46E5;
+      --primary-hover: #4338CA;
+      --bg: #0F172A;
+      --card-bg: #1E293B;
+      --text: #F8FAFC;
+      --subtext: #94A3B8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Times New Roman', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+
+    /* Layout màn hình */
+    .screen { display: none; width: 100vw; height: 100vh; padding: 2rem; flex-direction: column; justify-content: center; align-items: center; text-align: center; box-sizing: border-box; }
+    .screen.active { display: flex; }
+
+    h1 { font-size: 2.5rem; margin-bottom: 1rem; color: #60A5FA; }
+    p { font-size: 1.2rem; color: var(--subtext); max-width: 600px; margin-bottom: 2rem; line-height: 1.6; }
+
+    /* Buttons */
+    .btn { background: var(--primary); color: white; border: none; padding: 1.2rem 2.5rem; font-size: 1.3rem; font-weight: bold; border-radius: 50px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4); }
+    .btn:hover { background: var(--primary-hover); transform: translateY(-2px); }
+
+    /* Form & Tags */
+    .form-group { margin-bottom: 1.5rem; text-align: left; width: 100%; max-width: 500px; }
+    label { display: block; margin-bottom: 0.5rem; font-weight: bold; color: #E2E8F0; }
+    input[type="text"] { width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid #334155; background: #0F172A; color: white; font-size: 1rem; }
+    
+    .tags-container { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; justify-content: center; }
+    .tag { background: #334155; padding: 0.6rem 1.2rem; border-radius: 20px; cursor: pointer; font-size: 0.95rem; user-select: none; transition: 0.2s; }
+    .tag.selected { background: #2563EB; color: white; font-weight: bold; }
+
+    /* Checkbox Consent */
+    .checkbox-group { display: flex; align-items: flex-start; gap: 0.8rem; margin-bottom: 1rem; text-align: left; max-width: 500px; }
+    .checkbox-group input { width: 20px; height: 20px; margin-top: 3px; }
+
+    /* Camera Container */
+    .camera-box { position: relative; width: 480px; height: 360px; background: #000; border-radius: 16px; overflow: hidden; border: 3px solid #3B82F6; margin-bottom: 1.5rem; }
+    #webcam { width: 100%; height: 100%; object-fit: cover; }
+    #countdown { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 6rem; font-weight: bold; color: #F59E0B; text-shadow: 0 0 20px rgba(0,0,0,0.8); display: none; }
+
+    /* Animation Loading */
+    .loader { border: 6px solid #1E293B; border-top: 6px solid #3B82F6; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 1.5rem; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* Preview In Ảnh */
+    #print-preview { background: white; padding: 10px; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 1.5rem; }
+
+    /* Thiết lập Khổ Giấy In (@media print) */
+    @media print {
+      body * { visibility: hidden; }
+      #print-area, #print-area * { visibility: visible; }
+      #print-area { position: absolute; left: 0; top: 0; width: 100%; display: flex; justify-content: center; }
+      #print-canvas { width: 4in; height: 6in; } /* Khổ 4x6 inch */
+    }
+  </style>
+</head>
+<body>
+
+  <!-- MÀN HÌNH 1: MÀN HÌNH CHỜ -->
+  <div id="screen-1" class="screen active">
+    <h1>BẠN NĂM NHẤT?</h1>
+    <p>Chụp một tấm ảnh – Tìm ngay bạn bè cùng gu học tập & sở thích tại trường!</p>
+    <button class="btn" onclick="nextScreen(2)">CHẠM ĐỂ BẮT ĐẦU</button>
+  </div>
+
+  <!-- MÀN HÌNH 2: ĐỒNG Ý QUYỀN RIÊNG TƯ (NĐ 13/2023) -->
+  <div id="screen-2" class="screen">
+    <h2>Điều khoản & Đồng ý dữ liệu</h2>
+    <p style="font-size: 0.95rem;">Theo Nghị định 13/2023/NĐ-CP, ảnh và thông tin liên hệ của bạn sẽ được dùng để ghép đôi ngẫu nhiên với 1 bạn khác.</p>
+    
+    <div class="checkbox-group">
+      <input type="checkbox" id="consent-1">
+      <label for="consent-1">Đồng ý cho phép lưu trữ hình ảnh và thông tin hồ sơ tạm thời.</label>
+    </div>
+    <div class="checkbox-group">
+      <input type="checkbox" id="consent-2">
+      <label for="consent-2">Đồng ý chia sẻ kênh liên hệ (Zalo/Instagram) cho người ghép hợp gu.</label>
+    </div>
+
+    <button class="btn" style="margin-top: 1rem;" onclick="validateConsent()">TIẾP TỤC</button>
+  </div>
+
+  <!-- MÀN HÌNH 3: HỒ SƠ NHANH -->
+  <div id="screen-3" class="screen">
+    <h2>Tạo Hồ Sơ Hợp Gu</h2>
+    
+    <div class="form-group">
+      <label>Tên / Biệt danh:</label>
+      <input type="text" id="user-name" placeholder="Ví dụ: Minh Tuấn">
+    </div>
+
+    <div class="form-group">
+      <label>Liên hệ (Instagram / Zalo / Facebook):</label>
+      <input type="text" id="user-contact" placeholder="@instagram_cua_ban hoặc SĐT Zalo">
+    </div>
+
+    <div class="form-group">
+      <label>Sở thích (Chọn tối đa 3 thẻ):</label>
+      <div class="tags-container" id="hobby-tags">
+        <div class="tag" onclick="toggleTag(this)">🎵 Âm nhạc</div>
+        <div class="tag" onclick="toggleTag(this)">🎮 Chơi Game</div>
+        <div class="tag" onclick="toggleTag(this)">📚 Đọc sách</div>
+        <div class="tag" onclick="toggleTag(this)">💻 Lập trình</div>
+        <div class="tag" onclick="toggleTag(this)">☕ Quán Cà phê</div>
+        <div class="tag" onclick="toggleTag(this)">⚽ Thể thao</div>
+      </div>
+    </div>
+
+    <button class="btn" onclick="saveProfile()">SẴN SÀNG CHỤP ẢNH</button>
+  </div>
+
+  <!-- MÀN HÌNH 4: CHỤP ẢNH -->
+  <div id="screen-4" class="screen">
+    <h2>Tạo Dáng Nhé!</h2>
+    <div class="camera-box">
+      <video id="webcam" autoplay playsinline></video>
+      <div id="countdown">3</div>
+    </div>
+    <button class="btn" id="btn-snap" onclick="startCountdown()">CHỤP ẢNH (3S)</button>
+  </div>
+
+  <!-- MÀN HÌNH 5: ĐANG TÌM BẠN HỢP GU -->
+  <div id="screen-5" class="screen">
+    <div class="loader"></div>
+    <h2>Đang tìm người hợp gu nhất với bạn...</h2>
+    <p>Thuật toán đang phân tích điểm tương đồng về sở thích!</p>
+  </div>
+
+  <!-- MÀN HÌNH 6: KẾT QUẢ & IN -->
+  <div id="screen-6" class="screen">
+    <h2>Kết Quả Ghép Đôi!</h2>
+    <p style="margin-bottom: 0.5rem;">Đã tìm thấy 1 bạn có điểm tương hợp 85% với bạn!</p>
+    
+    <div id="print-area">
+      <canvas id="print-canvas" width="400" height="600"></canvas>
+    </div>
+
+    <button class="btn" style="margin-top: 1rem;" onclick="printPhoto()">IN TẤM ẢNH NÀY</button>
+  </div>
+
+  <!-- MÀN HÌNH 7: CẢM ƠN -->
+  <div id="screen-7" class="screen">
+    <h1>CẢM ƠN BẠN!</h1>
+    <p>Ảnh của bạn đang được in ra tại khe bên dưới. Hãy nhận ảnh và kết bạn ngay trong 48h nhé!</p>
+    <button class="btn" onclick="resetApp()">HOÀN THÀNH (HOẶC TỰ ĐỘNG SAU 10S)</button>
+  </div>
+
+  <script>
+    // Dữ liệu ứng dụng
+    let userData = { name: '', contact: '', hobbies: [], photoDataUrl: null };
+    let streamRef = null;
+
+    // Kho dữ liệu giả định người dùng trước (Kho ảnh gốc cho Cold Start)
+    const mockUsers = [
+      { name: "Lan Anh", contact: "IG: @lananh_2005", hobbies: ["🎵 Âm nhạc", "☕ Quán Cà phê", "📚 Đọc sách"], imgColor: "#EC4899" },
+      { name: "Hoàng Nam", contact: "Zalo: 0987xxx321", hobbies: ["🎮 Chơi Game", "💻 Lập trình", "⚽ Thể thao"], imgColor: "#3B82F6" },
+      { name: "Phương Thảo", contact: "IG: @thao_chill", hobbies: ["🎵 Âm nhạc", "☕ Quán Cà phê", "⚽ Thể thao"], imgColor: "#10B981" }
+    ];
+
+    // Điều hướng màn hình
+    function nextScreen(screenNumber) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(`screen-${screenNumber}`).classList.add('active');
+
+      if (screenNumber === 4) startCamera();
+    }
+
+    // Xác nhận Consent
+    function validateConsent() {
+      const c1 = document.getElementById('consent-1').checked;
+      const c2 = document.getElementById('consent-2').checked;
+      if (!c1 || !c2) {
+        alert("Bạn cần tích đồng ý cả 2 mục để tham gia ghép đôi nhé!");
+        return;
+      }
+      nextScreen(3);
+    }
+
+    // Chọn Thẻ Sở Thích
+    function toggleTag(element) {
+      const selected = document.querySelectorAll('.tag.selected');
+      if (!element.classList.contains('selected') && selected.length >= 3) {
+        alert("Bạn chỉ nên chọn tối đa 3 sở thích nổi bật nhất!");
+        return;
+      }
+      element.classList.toggle('selected');
+    }
+
+    // Lưu Hồ Sơ
+    function saveProfile() {
+      const name = document.getElementById('user-name').value.trim();
+      const contact = document.getElementById('user-contact').value.trim();
+      const selectedTags = Array.from(document.querySelectorAll('.tag.selected')).map(t => t.innerText);
+
+      if (!name || !contact) {
+        alert("Vui lòng điền tên và kênh liên hệ!");
+        return;
+      }
+      if (selectedTags.length === 0) {
+        alert("Hãy chọn ít nhất 1 sở thích!");
+        return;
+      }
+
+      userData.name = name;
+      userData.contact = contact;
+      userData.hobbies = selectedTags;
+
+      nextScreen(4);
+    }
+
+    // Bật Camera WebRTC
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+        streamRef = stream;
+        document.getElementById('webcam').srcObject = stream;
+      } catch (err) {
+        alert("Không thể mở Webcam! Vui lòng kiểm tra quyền truy cập camera trên trình duyệt.");
+      }
+    }
+
+    // Đếm ngược & Chụp ảnh
+    function startCountdown() {
+      document.getElementById('btn-snap').style.display = 'none';
+      const countdownEl = document.getElementById('countdown');
+      countdownEl.style.display = 'block';
+      let count = 3;
+      countdownEl.innerText = count;
+
+      const timer = setInterval(() => {
+        count--;
+        if (count > 0) {
+          countdownEl.innerText = count;
+        } else {
+          clearInterval(timer);
+          countdownEl.style.display = 'none';
+          snapPhoto();
+        }
+      }, 1000);
+    }
+
+    // Chụp & Chuyển sang tính toán ghép
+    function snapPhoto() {
+      const video = document.getElementById('webcam');
+      const canvas = document.createElement('canvas');
+      canvas.width = 300;
+      canvas.height = 300;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, 300, 300);
+
+      userData.photoDataUrl = canvas.toDataURL('image/png');
+
+      // Tắt camera tiết kiệm pin
+      if (streamRef) streamRef.getTracks().forEach(track => track.stop());
+
+      nextScreen(5);
+
+      // Giả lập thời gian server ghép đôi (3 giây)
+      setTimeout(() => {
+        generateMatchResult();
+        nextScreen(6);
+      }, 3000);
+    }
+
+    // Thuật toán chọn người ghép tương đồng & Vẽ Template In 4x6
+    function generateMatchResult() {
+      // Chọn người có sở thích chung nhiều nhất
+      let matchedUser = mockUsers[0];
+      let maxScore = -1;
+
+      mockUsers.forEach(user => {
+        const common = user.hobbies.filter(h => userData.hobbies.includes(h)).length;
+        if (common > maxScore) {
+          maxScore = common;
+          matchedUser = user;
+        }
+      });
+
+      // Vẽ Canvas In (Tỉ lệ 4x6 inch = 400x600 px)
+      const canvas = document.getElementById('print-canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Nền thiệp
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, 400, 600);
+
+      // Header
+      ctx.fillStyle = "#1E293B";
+      ctx.font = "bold 20px sans-serif";
+      ctx.fillText("HAI NGƯỜI BẠN TƯƠNG LAI?", 60, 40);
+
+      // Vẽ Ảnh Người Chụp
+      const userImg = new Image();
+      userImg.src = userData.photoDataUrl;
+      userImg.onload = () => {
+        ctx.drawImage(userImg, 30, 70, 160, 160);
+        
+        // Vẽ Ô Ảnh Người Ghép (Giả lập màu)
+        ctx.fillStyle = matchedUser.imgColor;
+        ctx.fillRect(210, 70, 160, 160);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "bold 16px sans-serif";
+        ctx.fillText(matchedUser.name, 240, 155);
+
+        // Khung Viền Ảnh
+        ctx.strokeStyle = "#4F46E5";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(30, 70, 160, 160);
+        ctx.strokeRect(210, 70, 160, 160);
+
+        // Điểm chung
+        ctx.fillStyle = "#0F172A";
+        ctx.font = "bold 16px sans-serif";
+        ctx.fillText(`Bạn: ${userData.name}`, 30, 260);
+        ctx.fillText(`Ghép với: ${matchedUser.name}`, 210, 260);
+
+        ctx.fillStyle = "#475569";
+        ctx.font = "14px sans-serif";
+        ctx.fillText(`Điểm chung: ${userData.hobbies.join(', ')}`, 30, 300);
+
+        // Thẻ Liên Hệ Mặt Sau / Góc Bên Dưới
+        ctx.fillStyle = "#F1F5F9";
+        ctx.fillRect(30, 340, 340, 180);
+
+        ctx.fillStyle = "#1E293B";
+        ctx.font = "bold 16px sans-serif";
+        ctx.fillText("THÔNG TIN KẾT BẠN", 120, 370);
+        ctx.font = "15px sans-serif";
+        ctx.fillText(`Liên hệ ${matchedUser.name}: ${matchedUser.contact}`, 50, 410);
+        ctx.fillText(`Gợi ý mở lời: "Cầu hay học ở đâu vậy?"`, 50, 440);
+
+        // QR Code giả lập
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(160, 460, 80, 80);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "10px sans-serif";
+        ctx.fillText("Quét QR Chat", 170, 505);
+
+        // Footer
+        ctx.fillStyle = "#94A3B8";
+        ctx.font = "12px sans-serif";
+        ctx.fillText("Campus Match Project - 2026", 130, 580);
+      };
+    }
+
+    // In Ảnh
+    function printPhoto() {
+      window.print();
+      nextScreen(7);
+      setTimeout(resetApp, 10000); // Tự động reset sau 10 giây
+    }
+
+    // Reset về màn hình chờ ban đầu
+    function resetApp() {
+      userData = { name: '', contact: '', hobbies: [], photoDataUrl: null };
+      document.getElementById('user-name').value = '';
+      document.getElementById('user-contact').value = '';
+      document.querySelectorAll('.tag.selected').forEach(t => t.classList.remove('selected'));
+      document.getElementById('consent-1').checked = false;
+      document.getElementById('consent-2').checked = false;
+      document.getElementById('btn-snap').style.display = 'inline-block';
+      nextScreen(1);
+    }
+  </script>
+</body>
+</html>
